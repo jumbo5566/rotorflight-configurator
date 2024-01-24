@@ -1,0 +1,178 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'release/*'
+
+jobs:
+
+  linux:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
+
+    - name: Install Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16.15.1
+
+    - name: Set build variables
+      run: |
+        echo "GIT_VER=${GITHUB_REF##*/}" >> ${GITHUB_ENV}
+        cat ${GITHUB_ENV}
+
+    - name: Initialise build environment
+      run: yarn install
+
+    - name: Build release for android
+      run: yarn gulp release --android
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: rotorflight-configurator-linux-release-${{ env.GIT_VER }}
+        path: release/rotorflight-configurator*
+
+
+  macos:
+
+    runs-on: macos-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
+
+    - name: Install Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16.15.1
+
+    - name: Set build variables
+      run: |
+        echo "GIT_VER=${GITHUB_REF##*/}" >> ${GITHUB_ENV}
+        cat ${GITHUB_ENV}
+
+    - name: Initialise build environment
+      run: yarn install
+
+    - name: Build release for MacOS
+      run: yarn gulp release --osx64
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: rotorflight-configurator-macos-release-${{ env.GIT_VER }}
+        path: release/rotorflight-configurator*
+
+
+  win64:
+
+    runs-on: windows-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
+
+    - name: Install Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16.15.1
+
+    - name: Set build variables
+      run: |
+        $GIT_VER = $env:GITHUB_REF -replace '.*/',''
+        echo "GIT_VER=$GIT_VER" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+    - name: Initialise build environment
+      run: yarn install
+
+    - name: Build release for windows
+      run: yarn gulp release --android
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: rotorflight-configurator-windows-release-${{ env.GIT_VER }}
+        path: release/rotorflight-configurator*
+
+
+  win32:
+
+    runs-on: windows-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
+
+    - name: Install Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16.15.1
+
+    - name: Set build variables
+      run: |
+        $GIT_VER = $env:GITHUB_REF -replace '.*/',''
+        echo "GIT_VER=$GIT_VER" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+    - name: Initialise build environment
+      run: yarn install
+
+    - name: Build release for windows
+      run: yarn gulp release --win32
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: rotorflight-configurator-windows-release-${{ env.GIT_VER }}
+        path: release/rotorflight-configurator*
+
+
+  release:
+
+    runs-on: ubuntu-latest
+
+    needs: [linux, macos, win64, win32]
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
+
+    - name: Set build variables
+      run: |
+        GIT_VER=${GITHUB_REF##*/}
+        GIT_TAG=${GITHUB_REF##refs/tags/}
+        if [[ ${GIT_VER} =~ ^[0-9]+[.][0-9]+[.][0-9]+[-][A-Za-z0-9]+ ]]
+        then
+          GH_TYPE='Release Candidate'
+        else
+          GH_TYPE='Release'
+        fi
+        echo "GIT_VER=${GIT_VER}" >> ${GITHUB_ENV}
+        echo "GIT_TAG=${GIT_TAG}" >> ${GITHUB_ENV}
+        echo "GH_TYPE=${GH_TYPE}" >> ${GITHUB_ENV}
+        cat ${GITHUB_ENV}
+
+    - name: Download Linux Artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: rotorflight-configurator-linux-release-${{ env.GIT_VER }}
+
+    - name: Download MacOS Artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: rotorflight-configurator-macos-release-${{ env.GIT_VER }}
+
+    - name: Download Windows Artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: rotorflight-configurator-windows-release-${{ env.GIT_VER }}
+
+    - name: Create Release
+      run: |
+        gh release create ${{ env.GIT_TAG }} --notes-file "Release.md" --title "Rotorflight Configurator ${{ env.GH_TYPE }} ${{ env.GIT_VER }}" rotorflight-configurator*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
